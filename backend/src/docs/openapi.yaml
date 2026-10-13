@@ -1,0 +1,261 @@
+openapi: 3.0.3
+info:
+  title: ClinicFlow API
+  version: 1.0.0
+  description: API de gestion de patients et rendez-vous. Comptes de démo — mot de passe `password123`.
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Patients
+  - name: Appointments
+  - name: Dashboard
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Connexion, retourne un JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: admin@clinicflow.com }
+                password: { type: string, example: password123 }
+      responses:
+        '200':
+          description: Authentifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Utilisateur courant
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /patients:
+    get:
+      tags: [Patients]
+      summary: Liste paginée des patients
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 10, maximum: 100 } }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Patients]
+      summary: Créer un patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientInput' }
+      responses:
+        '201': { description: Créé }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: CIN déjà utilisé }
+
+  /patients/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Patients]
+      summary: Détail d'un patient
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Patients]
+      summary: Modifier un patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientInput' }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Patients]
+      summary: Supprimer un patient (admin uniquement)
+      responses:
+        '204': { description: Supprimé }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /appointments:
+    get:
+      tags: [Appointments]
+      summary: Liste des rendez-vous
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/Status' } }
+        - { name: patientId, in: query, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Appointments]
+      summary: Créer un rendez-vous
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patientId, appointmentDate, reason]
+              properties:
+                patientId: { type: string, format: uuid }
+                appointmentDate: { type: string, format: date-time }
+                status: { $ref: '#/components/schemas/Status' }
+                reason: { type: string }
+                notes: { type: string, nullable: true }
+      responses:
+        '201': { description: Créé }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: Conflit de créneau (30 min) }
+
+  /appointments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Appointments]
+      summary: Détail d'un rendez-vous
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /appointments/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Appointments]
+      summary: Changer le statut d'un rendez-vous
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/Status' }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Conflit de créneau (30 min) }
+
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Statistiques du tableau de bord
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    Status:
+      type: string
+      enum: [pending, confirmed, cancelled]
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [admin, staff] }
+        createdAt: { type: string, format: date-time }
+    PatientInput:
+      type: object
+      required: [fullName, cin, phone, birthDate]
+      properties:
+        fullName: { type: string, example: Amine Benali }
+        cin: { type: string, example: AB123456 }
+        phone: { type: string, example: '+212600000000' }
+        birthDate: { type: string, format: date, example: '1990-05-12' }
+        address: { type: string, nullable: true }
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message: { type: string }
+            details: {}
+  responses:
+    BadRequest:
+      description: Erreur de validation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Token manquant ou invalide
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Permissions insuffisantes
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
