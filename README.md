@@ -25,6 +25,14 @@ Le schéma et le seed sont exécutés automatiquement au **premier** démarrage 
 docker compose down -v && docker compose up --build
 ```
 
+> **Port 4000 déjà occupé ?** Lancer l'API sur un autre port (PowerShell) :
+>
+> ```powershell
+> $env:API_PORT=4001; docker compose up --build
+> ```
+>
+> L'API et Swagger sont alors sur `http://localhost:4001`.
+
 ## Comptes de test
 
 Mot de passe pour tous : **`password123`**
@@ -95,6 +103,20 @@ Toutes les routes (sauf login) exigent `Authorization: Bearer <token>`.
 | PATCH | `/api/appointments/:id/status` | authentifié |
 
 Codes d'erreur : `400` validation (Zod), `401` non authentifié, `403` rôle insuffisant, `404` introuvable, `409` conflit (CIN déjà utilisée, RDV confirmé à moins de 30 min), `500` erreur serveur. Format : `{ "error": { "message", "details" } }`.
+
+## Swagger
+
+Documentation interactive de l'API : http://localhost:4000/api/docs
+
+Spécification OpenAPI : `backend/src/docs/openapi.yaml`. Pour tester les routes protégées, se connecter via `POST /auth/login` puis coller le token dans **Authorize**.
+
+## Tests
+
+```bash
+cd backend && npm install && npm test
+```
+
+Tests Jest + Supertest (base de données mockée, PostgreSQL non requis) : login valide, `401` sans token, `403` suppression de patient par un staff.
 
 ## Choix techniques
 
